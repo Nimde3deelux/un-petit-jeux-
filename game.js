@@ -1,15 +1,17 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// Dimensions du canvas
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
 // Variables de jeu
 const gravity = 0.5;
 let platforms = [];
 let enemies = [];
+let projectiles = [];  // Pour stocker les pierres lancées
 let keys = {};
+
+// Musique de fond
+const bgMusic = document.getElementById('bgMusic');
+bgMusic.volume = 0.5;
+bgMusic.play();
 
 // Classe pour les plateformes
 class Platform {
@@ -70,6 +72,34 @@ class Player {
         if (this.onGround) {
             this.dy = -this.jumpHeight;
         }
+    }
+
+    attack() {
+        // Lancer une pierre en appuyant sur la touche "A"
+        if (keys.KeyA) {
+            projectiles.push(new Projectile(this.x + this.width, this.y + this.height / 2));
+        }
+    }
+}
+
+// Classe pour les projectiles (pierres)
+class Projectile {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.width = 10;
+        this.height = 10;
+        this.speed = 7;
+    }
+
+    draw() {
+        ctx.fillStyle = 'gray';
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+    }
+
+    update() {
+        this.x += this.speed;
+        this.draw();
     }
 }
 
@@ -137,9 +167,20 @@ function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     player.update();
+    player.attack();
 
     platforms.forEach(platform => platform.draw());
     enemies.forEach(enemy => enemy.update(player));
+
+    // Mise à jour des projectiles
+    projectiles.forEach((projectile, index) => {
+        projectile.update();
+
+        // Supprimer les projectiles en dehors du canvas
+        if (projectile.x > canvas.width) {
+            projectiles.splice(index, 1);
+        }
+    });
 
     requestAnimationFrame(gameLoop);
 }

@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Jeu de plateforme 2D</title>
+  <title>Jeu de plateforme 2D - Ennemis et Attaques</title>
   <style>
     body {
       margin: 0;
@@ -48,68 +48,77 @@
   <!-- Menu de démarrage -->
   <div id="menu">
     <h1>Jeu de plateforme 2D</h1>
-    <p>Ramassez des boules et terminez le niveau en entrant dans la maison !</p>
+    <p>Ramassez des boules, éliminez les ennemis, et terminez le niveau en entrant dans la maison !</p>
     <button id="playBtn">Jouer</button>
   </div>
   <!-- Score affiché en overlay -->
   <div id="score">Score: 0</div>
-  <!-- Zone de jeu en Full HD -->
-  <canvas id="gameCanvas" width="1920" height="1080"></canvas>
+  <!-- Canvas en résolution par défaut -->
+  <canvas id="gameCanvas" width="800" height="400"></canvas>
   
   <script>
     // Récupération du canvas et du contexte
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
-
-    // Dimensions du niveau
     const levelWidth = 2000;
-    const levelHeight = canvas.height; // 1080
+    const levelHeight = canvas.height; // 400
 
     // Variables de contrôle clavier
     const keys = {};
 
-    // Chargement des images pour le personnage depuis le dossier "images"
+    // Chargement des images du joueur depuis le dossier "images"
     const playerStaticImg = new Image();
-    playerStaticImg.src = "images/perso.png"; // image statique
+    playerStaticImg.src = "images/perso.png";
     const playerMovingImg = new Image();
-    playerMovingImg.src = "images/perso.gif"; // gif animé lors du déplacement
+    playerMovingImg.src = "images/perso.gif";
+    const playerTransfoImg = new Image();
+    playerTransfoImg.src = "images/transfo.gif";
+
+    // Chargement des images ennemies
+    const enemyImages = [];
+    for (let i = 1; i <= 4; i++) {
+      let img = new Image();
+      img.src = "images/enemie" + i + ".png";
+      enemyImages.push(img);
+    }
 
     // Définition du joueur
     const player = {
       x: 100,
-      y: 980, // positionné sur le sol (ground y = 1030 - player.height (50))
+      y: 300, // Sur le sol : le sol est à y = 350 et la hauteur du joueur est 50
       width: 40,
       height: 50,
       vx: 0,
       vy: 0,
       speed: 3,
       jumpStrength: 12,
-      onGround: false
+      onGround: false,
+      facing: "right", // Direction par défaut
+      transformed: false,
+      attacking: false
     };
 
-    // Gravité (accélération verticale)
+    // Gravité
     const gravity = 0.5;
 
-    // Plateformes : le sol est positionné en bas, et quelques plateformes intermédiaires
+    // Plateformes (le sol et quelques plateformes intermédiaires)
     const platforms = [
-      { x: 0, y: 1030, width: levelWidth, height: 50 }, // sol
-      { x: 300, y: 900, width: 150, height: 10 },
-      { x: 700, y: 800, width: 150, height: 10 },
-      { x: 1200, y: 850, width: 150, height: 10 }
+      { x: 0, y: 350, width: levelWidth, height: 50 },  // sol
+      { x: 300, y: 280, width: 150, height: 10 },
+      { x: 700, y: 250, width: 150, height: 10 },
+      { x: 1200, y: 300, width: 150, height: 10 }
     ];
 
-    // Boules à collecter (positionnées sur le niveau)
+    // Boules à collecter
     const balls = [];
     for (let i = 0; i < 10; i++) {
       const ball = {
         x: 150 + Math.random() * (levelWidth - 300),
-        y: 0, // sera positionnée sur le sol ou sur la plateforme la plus proche
+        y: 0,
         radius: 10,
         collected: false
       };
-      // Position par défaut sur le sol
-      ball.y = 1020; // 1030 (sol) - 10 (rayon) pour bien se placer
-      // Ajustement si la boule se trouve au-dessus d'une plateforme
+      ball.y = 340; // Par défaut, sur le sol (350 - 10)
       platforms.forEach(p => {
         if (ball.x > p.x && ball.x < p.x + p.width && p.y < ball.y) {
           ball.y = p.y - ball.radius - 2;
@@ -118,24 +127,94 @@
       balls.push(ball);
     }
 
-    // Maison (objectif du niveau) située à l'extrémité droite
+    // Maison (objectif du niveau)
     const house = {
       x: levelWidth - 150,
-      y: 800, // ajustement pour que la maison soit sur un niveau accessible
+      y: 250,
       width: 100,
       height: 100
     };
 
-    // Variables de score et d'état de fin de niveau
+    // Ennemis (4 ennemis avec images et patrouille)
+    const enemies = [];
+    enemies.push({
+      x: 500,
+      y: 350 - 40, // Sur le sol
+      width: 40,
+      height: 40,
+      vx: 1,
+      minX: 500,
+      maxX: 700,
+      image: enemyImages[0]
+    });
+    enemies.push({
+      x: 1000,
+      y: 350 - 40,
+      width: 40,
+      height: 40,
+      vx: 1,
+      minX: 900,
+      maxX: 1100,
+      image: enemyImages[1]
+    });
+    enemies.push({
+      x: 320,
+      y: 280 - 40,  // Sur la plateforme à x=300, y=280
+      width: 40,
+      height: 40,
+      vx: 1,
+      minX: 300,
+      maxX: 450,
+      image: enemyImages[2]
+    });
+    enemies.push({
+      x: 1600,
+      y: 350 - 40,
+      width: 40,
+      height: 40,
+      vx: 1,
+      minX: 1550,
+      maxX: 1700,
+      image: enemyImages[3]
+    });
+
+    // Tableau des attaques (projectiles tirés)
+    const attacks = [];
+
+    // Décalage de la caméra pour le défilement horizontal
+    let cameraOffsetX = 0;
+
+    // Variables de score et fin de niveau
     let score = 0;
     let levelFinished = false;
-
-    // Décalage de la caméra pour suivre le joueur
-    let cameraOffsetX = 0;
 
     // Gestion des événements clavier
     document.addEventListener("keydown", (e) => {
       keys[e.key] = true;
+
+      // Attaque avec la touche K
+      if (e.key.toLowerCase() === "k" && !player.attacking) {
+        player.attacking = true;
+        // Le joueur s'arrête
+        player.vx = 0;
+        // Création d'un projectile d'attaque (boule jaune)
+        const attack = {
+          x: player.x + player.width / 2,
+          y: player.y + player.height / 2,
+          radius: 10,
+          vx: (player.facing === "left" ? -5 : 5)
+        };
+        attacks.push(attack);
+        // Fin de l'attaque après 300ms
+        setTimeout(() => { player.attacking = false; }, 300);
+      }
+
+      // Transformation avec la touche I
+      if (e.key.toLowerCase() === "i" && !player.transformed) {
+        player.transformed = true;
+        // Pendant 3 secondes, le joueur affichera transfo.gif
+        setTimeout(() => { player.transformed = false; }, 3000);
+      }
     });
     document.addEventListener("keyup", (e) => {
       keys[e.key] = false;
@@ -143,15 +222,19 @@
 
     // Boucle de mise à jour du jeu
     function update() {
-      if (levelFinished) return; // arrêter si le niveau est terminé
+      if (levelFinished) return;
 
-      // Contrôle horizontal
+      // Gestion du mouvement horizontal
       if (keys["ArrowLeft"]) {
         player.vx = -player.speed;
+        player.facing = "left";
       } else if (keys["ArrowRight"]) {
         player.vx = player.speed;
+        player.facing = "right";
       } else {
-        player.vx = 0;
+        if (!player.attacking) { // si pas en attaque, on arrête le mouvement
+          player.vx = 0;
+        }
       }
 
       // Saut avec la barre d'espace
@@ -163,7 +246,7 @@
       // Application de la gravité
       player.vy += gravity;
 
-      // Mise à jour des positions
+      // Mise à jour de la position du joueur
       player.x += player.vx;
       player.y += player.vy;
 
@@ -182,12 +265,51 @@
         }
       });
 
-      // Empêcher le joueur de tomber sous le niveau
+      // Empêcher le joueur de tomber en dessous du niveau
       if (player.y + player.height > levelHeight) {
         player.y = levelHeight - player.height;
         player.vy = 0;
         player.onGround = true;
       }
+
+      // Mise à jour des projectiles d'attaque
+      for (let i = attacks.length - 1; i >= 0; i--) {
+        const attack = attacks[i];
+        attack.x += attack.vx;
+        // Suppression si le projectile sort des limites du niveau
+        if (attack.x < 0 || attack.x > levelWidth) {
+          attacks.splice(i, 1);
+        }
+      }
+
+      // Collision entre attaque et ennemis
+      for (let i = attacks.length - 1; i >= 0; i--) {
+        const attack = attacks[i];
+        for (let j = enemies.length - 1; j >= 0; j--) {
+          const enemy = enemies[j];
+          if (
+            attack.x > enemy.x &&
+            attack.x < enemy.x + enemy.width &&
+            attack.y > enemy.y &&
+            attack.y < enemy.y + enemy.height
+          ) {
+            // L'ennemi est éliminé et le projectile disparaît
+            enemies.splice(j, 1);
+            attacks.splice(i, 1);
+            score++;
+            document.getElementById("score").innerText = "Score: " + score;
+            break;
+          }
+        }
+      }
+
+      // Mise à jour du mouvement des ennemis (patrouille)
+      enemies.forEach(enemy => {
+        enemy.x += enemy.vx;
+        if (enemy.x < enemy.minX || enemy.x > enemy.maxX) {
+          enemy.vx = -enemy.vx;
+        }
+      });
 
       // Collecte des boules
       balls.forEach(ball => {
@@ -203,7 +325,7 @@
         }
       });
 
-      // Vérifier si le joueur entre dans la maison (objectif du niveau)
+      // Vérification si le joueur atteint la maison (fin du niveau)
       if (
         player.x < house.x + house.width &&
         player.x + player.width > house.x &&
@@ -222,10 +344,7 @@
 
     // Fonction de dessin
     function draw() {
-      // Effacer le canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Sauvegarder le contexte et décaler pour la caméra
       ctx.save();
       ctx.translate(-cameraOffsetX, 0);
 
@@ -249,20 +368,38 @@
         }
       });
 
-      // Dessiner la maison (objectif)
+      // Dessiner la maison
       ctx.fillStyle = "#8B4513";
       ctx.fillRect(house.x, house.y, house.width, house.height);
       ctx.fillStyle = "#000";
       ctx.fillRect(house.x + house.width / 2 - 10, house.y + house.height - 40, 20, 40);
 
-      // Dessiner le joueur avec l'image appropriée
-      // Si une touche de déplacement (flèche gauche ou droite) est enfoncée, on affiche le gif animé
-      const moving = keys["ArrowLeft"] || keys["ArrowRight"];
-      if (moving) {
-        ctx.drawImage(playerMovingImg, player.x, player.y, player.width, player.height);
+      // Dessiner les ennemis
+      enemies.forEach(enemy => {
+        ctx.drawImage(enemy.image, enemy.x, enemy.y, enemy.width, enemy.height);
+      });
+
+      // Dessiner les projectiles d'attaque
+      attacks.forEach(attack => {
+        ctx.fillStyle = "#ff0";
+        ctx.beginPath();
+        ctx.arc(attack.x, attack.y, attack.radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Choix de l'image du joueur
+      let playerImg;
+      if (player.transformed) {
+        playerImg = playerTransfoImg;
+      } else if (player.attacking) {
+        // Lors de l'attaque, on peut afficher l'image statique
+        playerImg = playerStaticImg;
+      } else if (keys["ArrowLeft"] || keys["ArrowRight"]) {
+        playerImg = playerMovingImg;
       } else {
-        ctx.drawImage(playerStaticImg, player.x, player.y, player.width, player.height);
+        playerImg = playerStaticImg;
       }
+      ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
 
       ctx.restore();
 
@@ -283,13 +420,22 @@
       score = 0;
       document.getElementById("score").innerText = "Score: 0";
       levelFinished = false;
-      // Réinitialisation de la position et des vitesses du joueur
+      // Réinitialisation de la position et des états du joueur
       player.x = 100;
-      player.y = 980;
+      player.y = 300;
       player.vx = 0;
       player.vy = 0;
+      player.transformed = false;
+      player.attacking = false;
       // Remise à zéro de la collecte des boules
       balls.forEach(ball => ball.collected = false);
+      // Réinitialisation des positions des ennemis
+      enemies[0].x = 500;
+      enemies[1].x = 1000;
+      enemies[2].x = 320;
+      enemies[3].x = 1600;
+      // Suppression des attaques en cours
+      attacks.length = 0;
       update();
     });
   </script>

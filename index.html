@@ -2,257 +2,290 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Jeu 3D Amélioré</title>
+  <title>Jeu de plateforme 2D</title>
   <style>
-    body { margin: 0; overflow: hidden; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #222;
+      font-family: sans-serif;
+    }
     #menu {
       position: absolute;
       top: 0;
       left: 0;
-      width: 100%;
-      height: 100%;
+      width: 100vw;
+      height: 100vh;
       background: rgba(0,0,0,0.8);
+      color: #fff;
       display: flex;
-      align-items: center;
-      justify-content: center;
       flex-direction: column;
+      justify-content: center;
+      align-items: center;
       z-index: 10;
     }
-    button {
+    #menu button {
       padding: 10px 20px;
       font-size: 20px;
       cursor: pointer;
+      margin-top: 20px;
     }
     #score {
       position: absolute;
       top: 10px;
       left: 10px;
-      color: white;
+      color: #fff;
       font-size: 20px;
       z-index: 5;
+    }
+    canvas {
+      display: block;
+      background: #444;
     }
   </style>
 </head>
 <body>
   <!-- Menu de démarrage -->
   <div id="menu">
-    <h1>Jeu 3D Amélioré</h1>
+    <h1>Jeu de plateforme 2D</h1>
+    <p>Ramassez des boules et terminez le niveau en entrant dans la maison !</p>
     <button id="playBtn">Jouer</button>
   </div>
-  <div id="score">Boules: 0</div>
-
-  <!-- Inclusion de Three.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- Score affiché en overlay -->
+  <div id="score">Score: 0</div>
+  <!-- Zone de jeu -->
+  <canvas id="gameCanvas" width="800" height="400"></canvas>
+  
   <script>
-    // Variables globales
-    let scene, camera, renderer;
-    let player, playerSpeed = 0.1, runMultiplier = 2;
-    let keys = {};
-    let balls = [];         // Boules à ramasser
-    let thrownBalls = [];   // Boules lancées
-    let ballInventory = 0;  // Nombre de boules collectées
-    let canJump = false, velocityY = 0;
-    const gravity = -0.01;  // Gravité ajustée
+    // Récupération du canvas et du contexte
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
 
-    // Contrôle de la caméra par angles (coordonnées sphériques)
-    let cameraAngleHorizontal = Math.PI; // Initialement derrière le joueur
-    let cameraAngleVertical = 0.3;         // Légère élévation
-    const cameraDistance = 5;              // Distance entre caméra et joueur
+    // Dimensions du niveau
+    const levelWidth = 2000;
+    const levelHeight = canvas.height;
 
-    // Initialisation de la scène
-    function init() {
-      scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-      
-      renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      document.body.appendChild(renderer.domElement);
-      
-      // Ajout de lumières pour un rendu plus réaliste
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-      scene.add(ambientLight);
-      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-      directionalLight.position.set(5, 10, 7.5);
-      scene.add(directionalLight);
-      
-      // Création d'un sol
-      const planeGeometry = new THREE.PlaneGeometry(100, 100);
-      const planeMaterial = new THREE.MeshLambertMaterial({ color: 0x008800, side: THREE.DoubleSide });
-      const plane = new THREE.Mesh(planeGeometry, planeMaterial);
-      plane.rotation.x = Math.PI / 2;
-      scene.add(plane);
-      
-      // Création du joueur (cube bleu)
-      const playerGeometry = new THREE.BoxGeometry(1, 1, 1);
-      const playerMaterial = new THREE.MeshLambertMaterial({ color: 0x0000ff });
-      player = new THREE.Mesh(playerGeometry, playerMaterial);
-      player.position.y = 0.5;
-      scene.add(player);
-      
-      // Ajout des mains au personnage (petits cubes dorés)
-      const handGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
-      const handMaterial = new THREE.MeshLambertMaterial({ color: 0xffd700 });
-      const leftHand = new THREE.Mesh(handGeometry, handMaterial);
-      leftHand.position.set(-0.6, 0.2, 0); // Positionnement par rapport au cube du joueur
-      player.add(leftHand);
-      const rightHand = new THREE.Mesh(handGeometry, handMaterial);
-      rightHand.position.set(0.6, 0.2, 0);
-      player.add(rightHand);
-      
-      // Création de quelques boules à ramasser (sphères rouges)
-      const ballGeometry = new THREE.SphereGeometry(0.3, 16, 16);
-      const ballMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000 });
-      for (let i = 0; i < 10; i++) {
-        const ball = new THREE.Mesh(ballGeometry, ballMaterial);
-        ball.position.set((Math.random() - 0.5) * 20, 0.3, (Math.random() - 0.5) * 20);
-        scene.add(ball);
-        balls.push(ball);
-      }
-      
-      // Gestion des événements clavier
-      document.addEventListener('keydown', onKeyDown);
-      document.addEventListener('keyup', onKeyUp);
-      window.addEventListener('resize', onWindowResize);
-      
-      animate();
-    }
-    
-    // Gestion du redimensionnement de la fenêtre
-    function onWindowResize() {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    }
-    
-    // Gestion des pressions sur les touches
-    function onKeyDown(event) {
-      keys[event.key.toLowerCase()] = true;
-      // Lancer une boule avec la touche "L"
-      if (event.key.toLowerCase() === 'l') {
-        lancerBoule();
-      }
-    }
-    
-    function onKeyUp(event) {
-      keys[event.key.toLowerCase()] = false;
-    }
-    
-    // Fonction pour lancer une boule collectée
-    function lancerBoule() {
-      if (ballInventory > 0) {
-        const ballGeometry = new THREE.SphereGeometry(0.3, 16, 16);
-        const ballMaterial = new THREE.MeshLambertMaterial({ color: 0xffff00 });
-        const thrownBall = new THREE.Mesh(ballGeometry, ballMaterial);
-        thrownBall.position.copy(player.position);
-        scene.add(thrownBall);
-        // Définir la direction de lancement basée sur l'orientation horizontale de la caméra
-        const direction = new THREE.Vector3(
-          Math.sin(cameraAngleHorizontal),
-          0.1, // légère inclinaison verticale
-          Math.cos(cameraAngleHorizontal)
-        ).normalize();
-        thrownBall.userData = { velocity: direction.multiplyScalar(0.3) };
-        thrownBalls.push(thrownBall);
-        
-        ballInventory--;
-        document.getElementById('score').innerText = "Boules: " + ballInventory;
-      }
-    }
-    
-    // Mise à jour de la position de la caméra en fonction des angles et de la position du joueur
-    function updateCamera() {
-      const offset = new THREE.Vector3();
-      offset.x = cameraDistance * Math.cos(cameraAngleVertical) * Math.sin(cameraAngleHorizontal);
-      offset.y = cameraDistance * Math.sin(cameraAngleVertical);
-      offset.z = cameraDistance * Math.cos(cameraAngleVertical) * Math.cos(cameraAngleHorizontal);
-      camera.position.copy(player.position).add(offset);
-      camera.lookAt(player.position);
-    }
-    
-    // Boucle d'animation principale
-    function animate() {
-      requestAnimationFrame(animate);
-      
-      // Vitesse de déplacement (course si Shift est enfoncé)
-      let moveSpeed = playerSpeed;
-      if (keys['shift']) moveSpeed *= runMultiplier;
-      
-      // Calcul de la direction de déplacement relative à la caméra (sur le plan XZ)
-      let forward = new THREE.Vector3(Math.sin(cameraAngleHorizontal), 0, Math.cos(cameraAngleHorizontal)).normalize();
-      let right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
-      
-      if (keys['z']) { // avancer
-        player.position.add(forward.clone().multiplyScalar(moveSpeed));
-      }
-      if (keys['s']) { // reculer
-        player.position.add(forward.clone().multiplyScalar(-moveSpeed));
-      }
-      if (keys['q']) { // gauche (strafe)
-        player.position.add(right.clone().multiplyScalar(-moveSpeed));
-      }
-      if (keys['d']) { // droite (strafe)
-        player.position.add(right.clone().multiplyScalar(moveSpeed));
-      }
-      
-      // Gestion du saut
-      if (keys[' '] && canJump) {
-        velocityY = 0.15;
-        canJump = false;
-      }
-      velocityY += gravity;
-      player.position.y += velocityY;
-      if (player.position.y <= 0.5) {
-        player.position.y = 0.5;
-        canJump = true;
-        velocityY = 0;
-      }
-      
-      // Mise à jour des angles de la caméra avec les flèches directionnelles
-      if (keys['arrowleft']) {
-        cameraAngleHorizontal += 0.03;
-      }
-      if (keys['arrowright']) {
-        cameraAngleHorizontal -= 0.03;
-      }
-      if (keys['arrowup']) {
-        cameraAngleVertical += 0.03;
-      }
-      if (keys['arrowdown']) {
-        cameraAngleVertical -= 0.03;
-      }
-      // Limiter l'angle vertical pour éviter que la caméra ne se retourne
-      cameraAngleVertical = Math.min(Math.PI / 2 - 0.1, Math.max(0.1, cameraAngleVertical));
-      
-      updateCamera();
-      
-      // Vérification de la collecte des boules
-      for (let i = balls.length - 1; i >= 0; i--) {
-        const ball = balls[i];
-        if (player.position.distanceTo(ball.position) < 1) {
-          scene.remove(ball);
-          balls.splice(i, 1);
-          ballInventory++;
-          document.getElementById('score').innerText = "Boules: " + ballInventory;
-        }
-      }
-      
-      // Animation des boules lancées
-      thrownBalls.forEach(tb => {
-        tb.position.add(tb.userData.velocity);
-        tb.userData.velocity.y += gravity;
-        if (tb.position.y <= 0.3) {
-          tb.position.y = 0.3;
-          tb.userData.velocity.set(0, 0, 0);
+    // Variables de contrôle clavier
+    const keys = {};
+
+    // Définition du joueur
+    const player = {
+      x: 100,
+      y: 300,
+      width: 40,
+      height: 50,
+      vx: 0,
+      vy: 0,
+      speed: 3,
+      jumpStrength: 12,
+      onGround: false
+    };
+
+    // Gravité (accélération verticale)
+    const gravity = 0.5;
+
+    // Plateformes : ici une grande plateforme au sol, vous pouvez ajouter d'autres plateformes
+    const platforms = [
+      { x: 0, y: 350, width: levelWidth, height: 50 },
+      // Exemple d'une plateforme intermédiaire
+      { x: 300, y: 280, width: 150, height: 10 },
+      { x: 700, y: 250, width: 150, height: 10 },
+      { x: 1200, y: 300, width: 150, height: 10 }
+    ];
+
+    // Boules à collecter (positionnées sur le niveau)
+    const balls = [];
+    for (let i = 0; i < 10; i++) {
+      // Réparties aléatoirement sur le sol ou sur une plateforme
+      const ball = {
+        x: 150 + Math.random() * (levelWidth - 300),
+        y: 0, // nous placerons la boule sur la plateforme la plus proche
+        radius: 10,
+        collected: false
+      };
+      // On fixe la hauteur de la boule en fonction du sol ou d'une plateforme
+      ball.y = 340; // par défaut sur le sol
+      // Si la boule tombe sur une plateforme intermédiaire, on l'ajuste (exemple simple)
+      platforms.forEach(p => {
+        if (ball.x > p.x && ball.x < p.x + p.width && p.y < ball.y) {
+          ball.y = p.y - ball.radius - 2;
         }
       });
-      
-      renderer.render(scene, camera);
+      balls.push(ball);
     }
-    
-    // Démarrer le jeu au clic sur "Jouer"
-    document.getElementById('playBtn').addEventListener('click', () => {
-      document.getElementById('menu').style.display = 'none';
-      init();
+
+    // Maison (objectif du niveau) située à la fin
+    const house = {
+      x: levelWidth - 150,
+      y: 250,
+      width: 100,
+      height: 100
+    };
+
+    // Variable de score et état de fin de niveau
+    let score = 0;
+    let levelFinished = false;
+
+    // Position de la caméra (décalage en x)
+    let cameraOffsetX = 0;
+
+    // Gestion des événements clavier
+    document.addEventListener("keydown", (e) => {
+      keys[e.key] = true;
+    });
+    document.addEventListener("keyup", (e) => {
+      keys[e.key] = false;
+    });
+
+    // Boucle de mise à jour du jeu
+    function update() {
+      if (levelFinished) return; // Stoppe la boucle si le niveau est terminé
+
+      // Contrôle horizontal
+      if (keys["ArrowLeft"]) {
+        player.vx = -player.speed;
+      } else if (keys["ArrowRight"]) {
+        player.vx = player.speed;
+      } else {
+        player.vx = 0;
+      }
+
+      // Saut (barre d'espace)
+      if (keys[" "] && player.onGround) {
+        player.vy = -player.jumpStrength;
+        player.onGround = false;
+      }
+
+      // Application de la gravité
+      player.vy += gravity;
+
+      // Mise à jour des positions
+      player.x += player.vx;
+      player.y += player.vy;
+
+      // Collision avec les plateformes
+      player.onGround = false;
+      platforms.forEach(platform => {
+        // Vérification simple d'intersection (collision par le bas)
+        if (
+          player.x < platform.x + platform.width &&
+          player.x + player.width > platform.x &&
+          player.y + player.height > platform.y &&
+          player.y + player.height - player.vy <= platform.y
+        ) {
+          player.y = platform.y - player.height;
+          player.vy = 0;
+          player.onGround = true;
+        }
+      });
+
+      // Empêcher le joueur de tomber sous le niveau
+      if (player.y + player.height > levelHeight) {
+        player.y = levelHeight - player.height;
+        player.vy = 0;
+        player.onGround = true;
+      }
+
+      // Collecte des boules
+      balls.forEach(ball => {
+        if (!ball.collected) {
+          // Détection de collision simple (distance entre centres)
+          const dx = (player.x + player.width / 2) - ball.x;
+          const dy = (player.y + player.height / 2) - ball.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance < ball.radius + Math.min(player.width, player.height) / 2) {
+            ball.collected = true;
+            score++;
+            document.getElementById("score").innerText = "Score: " + score;
+          }
+        }
+      });
+
+      // Vérification si le joueur entre dans la maison (collision rectangle)
+      if (
+        player.x < house.x + house.width &&
+        player.x + player.width > house.x &&
+        player.y < house.y + house.height &&
+        player.y + player.height > house.y
+      ) {
+        levelFinished = true;
+      }
+
+      // Mise à jour du décalage de la caméra pour suivre le joueur
+      cameraOffsetX = Math.min(Math.max(player.x - canvas.width / 2, 0), levelWidth - canvas.width);
+
+      draw();
+      requestAnimationFrame(update);
+    }
+
+    // Fonction de dessin
+    function draw() {
+      // Effacer le canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Sauvegarder le contexte et décaler pour la caméra
+      ctx.save();
+      ctx.translate(-cameraOffsetX, 0);
+
+      // Dessiner le fond du niveau (sol)
+      ctx.fillStyle = "#555";
+      ctx.fillRect(0, 350, levelWidth, 50);
+
+      // Dessiner les plateformes
+      ctx.fillStyle = "#777";
+      platforms.forEach(p => {
+        ctx.fillRect(p.x, p.y, p.width, p.height);
+      });
+
+      // Dessiner les boules
+      balls.forEach(ball => {
+        if (!ball.collected) {
+          ctx.fillStyle = "#ff0";
+          ctx.beginPath();
+          ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      });
+
+      // Dessiner la maison (objectif)
+      ctx.fillStyle = "#8B4513";
+      ctx.fillRect(house.x, house.y, house.width, house.height);
+      // Dessiner la porte
+      ctx.fillStyle = "#000";
+      ctx.fillRect(house.x + house.width / 2 - 10, house.y + house.height - 40, 20, 40);
+
+      // Dessiner le joueur
+      ctx.fillStyle = "#00f";
+      ctx.fillRect(player.x, player.y, player.width, player.height);
+
+      ctx.restore();
+
+      // Si le niveau est terminé, afficher un message
+      if (levelFinished) {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#fff";
+        ctx.font = "40px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Niveau terminé !", canvas.width / 2, canvas.height / 2);
+      }
+    }
+
+    // Démarrage du jeu au clic sur "Jouer"
+    document.getElementById("playBtn").addEventListener("click", () => {
+      document.getElementById("menu").style.display = "none";
+      // Réinitialiser les variables si besoin
+      score = 0;
+      document.getElementById("score").innerText = "Score: 0";
+      levelFinished = false;
+      // Position de départ du joueur
+      player.x = 100;
+      player.y = 300;
+      player.vx = 0;
+      player.vy = 0;
+      // Remettre toutes les boules non ramassées
+      balls.forEach(ball => ball.collected = false);
+      update();
     });
   </script>
 </body>

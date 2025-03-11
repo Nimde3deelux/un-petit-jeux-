@@ -53,8 +53,8 @@
   </div>
   <!-- Score affiché en overlay -->
   <div id="score">Score: 0</div>
-  <!-- Zone de jeu -->
-  <canvas id="gameCanvas" width="800" height="400"></canvas>
+  <!-- Zone de jeu en Full HD -->
+  <canvas id="gameCanvas" width="1920" height="1080"></canvas>
   
   <script>
     // Récupération du canvas et du contexte
@@ -63,15 +63,21 @@
 
     // Dimensions du niveau
     const levelWidth = 2000;
-    const levelHeight = canvas.height;
+    const levelHeight = canvas.height; // 1080
 
     // Variables de contrôle clavier
     const keys = {};
 
+    // Chargement des images pour le personnage
+    const playerStaticImg = new Image();
+    playerStaticImg.src = "perso.png"; // image statique
+    const playerMovingImg = new Image();
+    playerMovingImg.src = "perso.gif"; // gif animé lors du déplacement
+
     // Définition du joueur
     const player = {
       x: 100,
-      y: 300,
+      y: 980, // positionné sur le sol (ground y = 1030 - player.height (50))
       width: 40,
       height: 50,
       vx: 0,
@@ -84,28 +90,26 @@
     // Gravité (accélération verticale)
     const gravity = 0.5;
 
-    // Plateformes : ici une grande plateforme au sol, vous pouvez ajouter d'autres plateformes
+    // Plateformes : le sol est positionné en bas, et quelques plateformes intermédiaires
     const platforms = [
-      { x: 0, y: 350, width: levelWidth, height: 50 },
-      // Exemple d'une plateforme intermédiaire
-      { x: 300, y: 280, width: 150, height: 10 },
-      { x: 700, y: 250, width: 150, height: 10 },
-      { x: 1200, y: 300, width: 150, height: 10 }
+      { x: 0, y: 1030, width: levelWidth, height: 50 }, // sol
+      { x: 300, y: 900, width: 150, height: 10 },
+      { x: 700, y: 800, width: 150, height: 10 },
+      { x: 1200, y: 850, width: 150, height: 10 }
     ];
 
     // Boules à collecter (positionnées sur le niveau)
     const balls = [];
     for (let i = 0; i < 10; i++) {
-      // Réparties aléatoirement sur le sol ou sur une plateforme
       const ball = {
         x: 150 + Math.random() * (levelWidth - 300),
-        y: 0, // nous placerons la boule sur la plateforme la plus proche
+        y: 0, // sera positionnée sur le sol ou sur la plateforme la plus proche
         radius: 10,
         collected: false
       };
-      // On fixe la hauteur de la boule en fonction du sol ou d'une plateforme
-      ball.y = 340; // par défaut sur le sol
-      // Si la boule tombe sur une plateforme intermédiaire, on l'ajuste (exemple simple)
+      // Position par défaut sur le sol
+      ball.y = 1020; // 1030 (sol) - 10 (rayon) pour bien se placer
+      // Ajustement si la boule se trouve au-dessus d'une plateforme
       platforms.forEach(p => {
         if (ball.x > p.x && ball.x < p.x + p.width && p.y < ball.y) {
           ball.y = p.y - ball.radius - 2;
@@ -114,19 +118,19 @@
       balls.push(ball);
     }
 
-    // Maison (objectif du niveau) située à la fin
+    // Maison (objectif du niveau) située à l'extrémité droite
     const house = {
       x: levelWidth - 150,
-      y: 250,
+      y: 800, // ajustement pour que la maison soit sur un niveau accessible
       width: 100,
       height: 100
     };
 
-    // Variable de score et état de fin de niveau
+    // Variables de score et d'état de fin de niveau
     let score = 0;
     let levelFinished = false;
 
-    // Position de la caméra (décalage en x)
+    // Décalage de la caméra pour suivre le joueur
     let cameraOffsetX = 0;
 
     // Gestion des événements clavier
@@ -139,7 +143,7 @@
 
     // Boucle de mise à jour du jeu
     function update() {
-      if (levelFinished) return; // Stoppe la boucle si le niveau est terminé
+      if (levelFinished) return; // arrêter si le niveau est terminé
 
       // Contrôle horizontal
       if (keys["ArrowLeft"]) {
@@ -150,7 +154,7 @@
         player.vx = 0;
       }
 
-      // Saut (barre d'espace)
+      // Saut avec la barre d'espace
       if (keys[" "] && player.onGround) {
         player.vy = -player.jumpStrength;
         player.onGround = false;
@@ -166,7 +170,6 @@
       // Collision avec les plateformes
       player.onGround = false;
       platforms.forEach(platform => {
-        // Vérification simple d'intersection (collision par le bas)
         if (
           player.x < platform.x + platform.width &&
           player.x + player.width > platform.x &&
@@ -189,7 +192,6 @@
       // Collecte des boules
       balls.forEach(ball => {
         if (!ball.collected) {
-          // Détection de collision simple (distance entre centres)
           const dx = (player.x + player.width / 2) - ball.x;
           const dy = (player.y + player.height / 2) - ball.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
@@ -201,7 +203,7 @@
         }
       });
 
-      // Vérification si le joueur entre dans la maison (collision rectangle)
+      // Vérifier si le joueur entre dans la maison (objectif du niveau)
       if (
         player.x < house.x + house.width &&
         player.x + player.width > house.x &&
@@ -227,13 +229,13 @@
       ctx.save();
       ctx.translate(-cameraOffsetX, 0);
 
-      // Dessiner le fond du niveau (sol)
+      // Dessiner le fond (sol)
       ctx.fillStyle = "#555";
-      ctx.fillRect(0, 350, levelWidth, 50);
+      ctx.fillRect(0, platforms[0].y, levelWidth, platforms[0].height);
 
-      // Dessiner les plateformes
+      // Dessiner les autres plateformes
       ctx.fillStyle = "#777";
-      platforms.forEach(p => {
+      platforms.slice(1).forEach(p => {
         ctx.fillRect(p.x, p.y, p.width, p.height);
       });
 
@@ -250,17 +252,21 @@
       // Dessiner la maison (objectif)
       ctx.fillStyle = "#8B4513";
       ctx.fillRect(house.x, house.y, house.width, house.height);
-      // Dessiner la porte
       ctx.fillStyle = "#000";
       ctx.fillRect(house.x + house.width / 2 - 10, house.y + house.height - 40, 20, 40);
 
-      // Dessiner le joueur
-      ctx.fillStyle = "#00f";
-      ctx.fillRect(player.x, player.y, player.width, player.height);
+      // Dessiner le joueur avec l'image appropriée
+      // S'il y a une touche de déplacement, on affiche le gif animé
+      const moving = keys["ArrowLeft"] || keys["ArrowRight"];
+      if (moving) {
+        ctx.drawImage(playerMovingImg, player.x, player.y, player.width, player.height);
+      } else {
+        ctx.drawImage(playerStaticImg, player.x, player.y, player.width, player.height);
+      }
 
       ctx.restore();
 
-      // Si le niveau est terminé, afficher un message
+      // Message de fin de niveau
       if (levelFinished) {
         ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -274,16 +280,15 @@
     // Démarrage du jeu au clic sur "Jouer"
     document.getElementById("playBtn").addEventListener("click", () => {
       document.getElementById("menu").style.display = "none";
-      // Réinitialiser les variables si besoin
       score = 0;
       document.getElementById("score").innerText = "Score: 0";
       levelFinished = false;
-      // Position de départ du joueur
+      // Réinitialisation de la position et des vitesses du joueur
       player.x = 100;
-      player.y = 300;
+      player.y = 980;
       player.vx = 0;
       player.vy = 0;
-      // Remettre toutes les boules non ramassées
+      // Remise à zéro de la collecte des boules
       balls.forEach(ball => ball.collected = false);
       update();
     });

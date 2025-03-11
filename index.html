@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Jeu 3D</title>
+  <title>Jeu 3D Amélioré</title>
   <style>
     body { margin: 0; overflow: hidden; }
     #menu {
@@ -36,11 +36,11 @@
 <body>
   <!-- Menu de démarrage -->
   <div id="menu">
-    <h1>Jeu 3D</h1>
+    <h1>Jeu 3D Amélioré</h1>
     <button id="playBtn">Jouer</button>
   </div>
-  <div id="score">Boule : 0</div>
-  
+  <div id="score">Boules: 0</div>
+
   <!-- Inclusion de Three.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
@@ -52,46 +52,64 @@
     let thrownBalls = [];   // Boules lancées
     let ballInventory = 0;  // Nombre de boules collectées
     let canJump = false, velocityY = 0;
-    const gravity = -0.005;
+    const gravity = -0.01;  // Gravité ajustée
+
+    // Contrôle de la caméra par angles (coordonnées sphériques)
+    let cameraAngleHorizontal = Math.PI; // Initialement derrière le joueur
+    let cameraAngleVertical = 0.3;         // Légère élévation
+    const cameraDistance = 5;              // Distance entre caméra et joueur
 
     // Initialisation de la scène
     function init() {
       scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
       
       renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
       document.body.appendChild(renderer.domElement);
       
+      // Ajout de lumières pour un rendu plus réaliste
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+      scene.add(ambientLight);
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      directionalLight.position.set(5, 10, 7.5);
+      scene.add(directionalLight);
+      
       // Création d'un sol
       const planeGeometry = new THREE.PlaneGeometry(100, 100);
-      const planeMaterial = new THREE.MeshBasicMaterial({ color: 0x008800, side: THREE.DoubleSide });
+      const planeMaterial = new THREE.MeshLambertMaterial({ color: 0x008800, side: THREE.DoubleSide });
       const plane = new THREE.Mesh(planeGeometry, planeMaterial);
       plane.rotation.x = Math.PI / 2;
       scene.add(plane);
       
       // Création du joueur (cube bleu)
       const playerGeometry = new THREE.BoxGeometry(1, 1, 1);
-      const playerMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff });
+      const playerMaterial = new THREE.MeshLambertMaterial({ color: 0x0000ff });
       player = new THREE.Mesh(playerGeometry, playerMaterial);
       player.position.y = 0.5;
       scene.add(player);
       
-      // Position initiale de la caméra derrière le joueur
-      camera.position.set(0, 2, -5);
-      camera.lookAt(player.position);
+      // Ajout des mains au personnage (petits cubes dorés)
+      const handGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+      const handMaterial = new THREE.MeshLambertMaterial({ color: 0xffd700 });
+      const leftHand = new THREE.Mesh(handGeometry, handMaterial);
+      leftHand.position.set(-0.6, 0.2, 0); // Positionnement par rapport au cube du joueur
+      player.add(leftHand);
+      const rightHand = new THREE.Mesh(handGeometry, handMaterial);
+      rightHand.position.set(0.6, 0.2, 0);
+      player.add(rightHand);
       
-      // Création de quelques boules (sphères rouges) à ramasser
+      // Création de quelques boules à ramasser (sphères rouges)
       const ballGeometry = new THREE.SphereGeometry(0.3, 16, 16);
-      const ballMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+      const ballMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000 });
       for (let i = 0; i < 10; i++) {
         const ball = new THREE.Mesh(ballGeometry, ballMaterial);
-        ball.position.set((Math.random()-0.5)*20, 0.3, (Math.random()-0.5)*20);
+        ball.position.set((Math.random() - 0.5) * 20, 0.3, (Math.random() - 0.5) * 20);
         scene.add(ball);
         balls.push(ball);
       }
       
-      // Ecouteurs d'événements pour les touches
+      // Gestion des événements clavier
       document.addEventListener('keydown', onKeyDown);
       document.addEventListener('keyup', onKeyUp);
       window.addEventListener('resize', onWindowResize);
@@ -109,7 +127,6 @@
     // Gestion des pressions sur les touches
     function onKeyDown(event) {
       keys[event.key.toLowerCase()] = true;
-      
       // Lancer une boule avec la touche "L"
       if (event.key.toLowerCase() === 'l') {
         lancerBoule();
@@ -123,51 +140,65 @@
     // Fonction pour lancer une boule collectée
     function lancerBoule() {
       if (ballInventory > 0) {
-        // Créer une nouvelle boule lancée (couleur jaune)
         const ballGeometry = new THREE.SphereGeometry(0.3, 16, 16);
-        const ballMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+        const ballMaterial = new THREE.MeshLambertMaterial({ color: 0xffff00 });
         const thrownBall = new THREE.Mesh(ballGeometry, ballMaterial);
         thrownBall.position.copy(player.position);
         scene.add(thrownBall);
-        
-        // Définir une vélocité initiale en fonction de la direction de la caméra
-        const direction = new THREE.Vector3();
-        camera.getWorldDirection(direction);
-        thrownBall.userData = { velocity: direction.multiplyScalar(0.2) };
+        // Définir la direction de lancement basée sur l'orientation horizontale de la caméra
+        const direction = new THREE.Vector3(
+          Math.sin(cameraAngleHorizontal),
+          0.1, // légère inclinaison verticale
+          Math.cos(cameraAngleHorizontal)
+        ).normalize();
+        thrownBall.userData = { velocity: direction.multiplyScalar(0.3) };
         thrownBalls.push(thrownBall);
         
         ballInventory--;
-        document.getElementById('score').innerText = "Boule : " + ballInventory;
+        document.getElementById('score').innerText = "Boules: " + ballInventory;
       }
+    }
+    
+    // Mise à jour de la position de la caméra en fonction des angles et de la position du joueur
+    function updateCamera() {
+      const offset = new THREE.Vector3();
+      offset.x = cameraDistance * Math.cos(cameraAngleVertical) * Math.sin(cameraAngleHorizontal);
+      offset.y = cameraDistance * Math.sin(cameraAngleVertical);
+      offset.z = cameraDistance * Math.cos(cameraAngleVertical) * Math.cos(cameraAngleHorizontal);
+      camera.position.copy(player.position).add(offset);
+      camera.lookAt(player.position);
     }
     
     // Boucle d'animation principale
     function animate() {
       requestAnimationFrame(animate);
       
-      // Gestion du déplacement du joueur
+      // Vitesse de déplacement (course si Shift est enfoncé)
       let moveSpeed = playerSpeed;
       if (keys['shift']) moveSpeed *= runMultiplier;
       
-      let moveX = 0, moveZ = 0;
-      if (keys['z']) moveZ -= moveSpeed;  // avancer
-      if (keys['s']) moveZ += moveSpeed;  // reculer
-      if (keys['q']) moveX -= moveSpeed;  // gauche
-      if (keys['d']) moveX += moveSpeed;  // droite
+      // Calcul de la direction de déplacement relative à la caméra (sur le plan XZ)
+      let forward = new THREE.Vector3(Math.sin(cameraAngleHorizontal), 0, Math.cos(cameraAngleHorizontal)).normalize();
+      let right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
       
-      // Mise à jour de la position du joueur
-      player.position.x += moveX;
-      player.position.z += moveZ;
-      
-      // Gestion du saut
-      if (keys[' ']) {
-        if (canJump) {
-          velocityY = 0.15;
-          canJump = false;
-        }
+      if (keys['z']) { // avancer
+        player.position.add(forward.clone().multiplyScalar(moveSpeed));
+      }
+      if (keys['s']) { // reculer
+        player.position.add(forward.clone().multiplyScalar(-moveSpeed));
+      }
+      if (keys['q']) { // gauche (strafe)
+        player.position.add(right.clone().multiplyScalar(-moveSpeed));
+      }
+      if (keys['d']) { // droite (strafe)
+        player.position.add(right.clone().multiplyScalar(moveSpeed));
       }
       
-      // Application de la gravité
+      // Gestion du saut
+      if (keys[' '] && canJump) {
+        velocityY = 0.15;
+        canJump = false;
+      }
       velocityY += gravity;
       player.position.y += velocityY;
       if (player.position.y <= 0.5) {
@@ -176,25 +207,23 @@
         velocityY = 0;
       }
       
-      // Contrôle de la caméra avec les flèches directionnelles
+      // Mise à jour des angles de la caméra avec les flèches directionnelles
       if (keys['arrowleft']) {
-        camera.rotation.y += 0.02;
+        cameraAngleHorizontal += 0.03;
       }
       if (keys['arrowright']) {
-        camera.rotation.y -= 0.02;
+        cameraAngleHorizontal -= 0.03;
       }
       if (keys['arrowup']) {
-        camera.rotation.x += 0.02;
+        cameraAngleVertical += 0.03;
       }
       if (keys['arrowdown']) {
-        camera.rotation.x -= 0.02;
+        cameraAngleVertical -= 0.03;
       }
+      // Limiter l'angle vertical pour éviter que la caméra ne se retourne
+      cameraAngleVertical = Math.min(Math.PI / 2 - 0.1, Math.max(0.1, cameraAngleVertical));
       
-      // Faire suivre la caméra au joueur
-      const cameraOffset = new THREE.Vector3(0, 2, -5);
-      const cameraPosition = player.position.clone().add(cameraOffset.applyEuler(camera.rotation));
-      camera.position.lerp(cameraPosition, 0.1);
-      camera.lookAt(player.position);
+      updateCamera();
       
       // Vérification de la collecte des boules
       for (let i = balls.length - 1; i >= 0; i--) {
@@ -203,17 +232,14 @@
           scene.remove(ball);
           balls.splice(i, 1);
           ballInventory++;
-          document.getElementById('score').innerText = "Boule : " + ballInventory;
+          document.getElementById('score').innerText = "Boules: " + ballInventory;
         }
       }
       
       // Animation des boules lancées
       thrownBalls.forEach(tb => {
-        // Déplacement de la boule selon sa vélocité
         tb.position.add(tb.userData.velocity);
-        // Application de la gravité
         tb.userData.velocity.y += gravity;
-        // Si la boule touche le sol, on la remet à niveau
         if (tb.position.y <= 0.3) {
           tb.position.y = 0.3;
           tb.userData.velocity.set(0, 0, 0);
@@ -223,7 +249,7 @@
       renderer.render(scene, camera);
     }
     
-    // Lancement du jeu au clic sur "Jouer"
+    // Démarrer le jeu au clic sur "Jouer"
     document.getElementById('playBtn').addEventListener('click', () => {
       document.getElementById('menu').style.display = 'none';
       init();

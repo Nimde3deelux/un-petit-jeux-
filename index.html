@@ -68,11 +68,11 @@
     // Variables de contrôle clavier
     const keys = {};
 
-    // Chargement des images pour le personnage
+    // Chargement des images pour le personnage depuis le dossier "images"
     const playerStaticImg = new Image();
-    playerStaticImg.src = "perso.png"; // image statique
+    playerStaticImg.src = "images/perso.png"; // image statique
     const playerMovingImg = new Image();
-    playerMovingImg.src = "perso.gif"; // gif animé lors du déplacement
+    playerMovingImg.src = "images/perso.gif"; // gif animé lors du déplacement
 
     // Définition du joueur
     const player = {
@@ -256,7 +256,7 @@
       ctx.fillRect(house.x + house.width / 2 - 10, house.y + house.height - 40, 20, 40);
 
       // Dessiner le joueur avec l'image appropriée
-      // S'il y a une touche de déplacement, on affiche le gif animé
+      // Si une touche de déplacement (flèche gauche ou droite) est enfoncée, on affiche le gif animé
       const moving = keys["ArrowLeft"] || keys["ArrowRight"];
       if (moving) {
         ctx.drawImage(playerMovingImg, player.x, player.y, player.width, player.height);

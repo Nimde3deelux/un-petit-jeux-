@@ -137,48 +137,29 @@
       height: 100
     };
 
-    // Ennemis (4 ennemis avec patrouille)
-    const enemies = [];
-    enemies.push({
-      x: 500,
-      y: 350 - 40, // sur le sol
-      width: 40,
-      height: 40,
-      vx: 1,
-      minX: 500,
-      maxX: 700,
-      image: enemyImages[0]
-    });
-    enemies.push({
-      x: 1000,
-      y: 350 - 40,
-      width: 40,
-      height: 40,
-      vx: 1,
-      minX: 900,
-      maxX: 1100,
-      image: enemyImages[1]
-    });
-    enemies.push({
-      x: 320,
-      y: 280 - 40,  // sur la plateforme à x = 300, y = 280
-      width: 40,
-      height: 40,
-      vx: 1,
-      minX: 300,
-      maxX: 450,
-      image: enemyImages[2]
-    });
-    enemies.push({
-      x: 1600,
-      y: 350 - 40,
-      width: 40,
-      height: 40,
-      vx: 1,
-      minX: 1550,
-      maxX: 1700,
-      image: enemyImages[3]
-    });
+    // Ennemis : Limiter à 2 ennemis maximum
+    const enemies = [
+      {
+        x: 500,
+        y: 350 - 40, // sur le sol
+        width: 40,
+        height: 40,
+        vx: 1,
+        minX: 500,
+        maxX: 700,
+        image: enemyImages[0]
+      },
+      {
+        x: 1000,
+        y: 350 - 40,
+        width: 40,
+        height: 40,
+        vx: 1,
+        minX: 900,
+        maxX: 1100,
+        image: enemyImages[1]
+      }
+    ];
 
     // Tableau des attaques (projectiles tirés)
     const attacks = [];
@@ -275,171 +256,97 @@
       }
 
       // Mise à jour des projectiles d'attaque
-      for (let i = attacks.length - 1; i >= 0; i--) {
+      for (let i = 0; i < attacks.length; i++) {
         const attack = attacks[i];
         attack.x += attack.vx;
-        // Supprimer le projectile s'il sort des limites du niveau
-        if (attack.x < 0 || attack.x > levelWidth) {
-          attacks.splice(i, 1);
-        }
-      }
 
-      // Collision entre attaques et ennemis
-      for (let i = attacks.length - 1; i >= 0; i--) {
-        const attack = attacks[i];
-        for (let j = enemies.length - 1; j >= 0; j--) {
-          const enemy = enemies[j];
+        // Collision avec les ennemis
+        enemies.forEach(enemy => {
           if (
-            attack.x > enemy.x &&
             attack.x < enemy.x + enemy.width &&
-            attack.y > enemy.y &&
-            attack.y < enemy.y + enemy.height
+            attack.x + attack.radius > enemy.x &&
+            attack.y < enemy.y + enemy.height &&
+            attack.y + attack.radius > enemy.y
           ) {
-            // L'ennemi est éliminé et le projectile disparaît
-            enemies.splice(j, 1);
+            score += 10;
             attacks.splice(i, 1);
-            score++;
-            document.getElementById("score").innerText = "Score: " + score;
-            break;
+            i--;
+            enemy.x = -999; // Enlever l'ennemi frappé du jeu
           }
-        }
+        });
       }
 
-      // Mise à jour du déplacement des ennemis (patrouille)
+      // Limitation des ennemis à 2
+      if (enemies.length > 2) {
+        enemies.splice(2); // Garder seulement 2 ennemis
+      }
+
+      // Mise à jour des ennemis
       enemies.forEach(enemy => {
         enemy.x += enemy.vx;
-        if (enemy.x < enemy.minX || enemy.x > enemy.maxX) {
+        if (enemy.x <= enemy.minX || enemy.x >= enemy.maxX) {
           enemy.vx = -enemy.vx;
         }
       });
 
-      // Collecte des boules
-      balls.forEach(ball => {
-        if (!ball.collected) {
-          const dx = (player.x + player.width / 2) - ball.x;
-          const dy = (player.y + player.height / 2) - ball.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          if (distance < ball.radius + Math.min(player.width, player.height) / 2) {
-            ball.collected = true;
-            score++;
-            document.getElementById("score").innerText = "Score: " + score;
-          }
-        }
-      });
-
-      // Vérifier si le joueur atteint la maison (fin du niveau)
-      if (
-        player.x < house.x + house.width &&
-        player.x + player.width > house.x &&
-        player.y < house.y + house.height &&
-        player.y + player.height > house.y
-      ) {
+      // Détection de la fin du niveau
+      if (player.x + player.width > house.x && player.x < house.x + house.width &&
+          player.y + player.height > house.y) {
         levelFinished = true;
+        alert("Vous avez terminé le niveau avec un score de " + score);
       }
 
-      // Mise à jour du décalage de la caméra
-      cameraOffsetX = Math.min(Math.max(player.x - canvas.width / 2, 0), levelWidth - canvas.width);
+      // Mise à jour du score
+      document.getElementById("score").textContent = "Score: " + score;
 
+      // Effacement et redessin
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       draw();
-      requestAnimationFrame(update);
     }
 
     // Fonction de dessin
     function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.save();
-      ctx.translate(-cameraOffsetX, 0);
+      ctx.fillStyle = "#4CAF50";
+      ctx.fillRect(player.x - cameraOffsetX, player.y, player.width, player.height);
 
-      // Dessiner le sol
-      ctx.fillStyle = "#555";
-      ctx.fillRect(0, platforms[0].y, levelWidth, platforms[0].height);
+      // Dessiner les projectiles
+      ctx.fillStyle = "yellow";
+      attacks.forEach(attack => {
+        ctx.beginPath();
+        ctx.arc(attack.x - cameraOffsetX, attack.y, attack.radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
 
-      // Dessiner les autres plateformes
-      ctx.fillStyle = "#777";
-      platforms.slice(1).forEach(p => {
-        ctx.fillRect(p.x, p.y, p.width, p.height);
+      // Dessiner les ennemis
+      enemies.forEach(enemy => {
+        ctx.drawImage(enemy.image, enemy.x - cameraOffsetX, enemy.y, enemy.width, enemy.height);
       });
 
       // Dessiner les boules
       balls.forEach(ball => {
         if (!ball.collected) {
-          ctx.fillStyle = "#ff0";
           ctx.beginPath();
-          ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+          ctx.arc(ball.x - cameraOffsetX, ball.y, ball.radius, 0, Math.PI * 2);
+          ctx.fillStyle = "yellow";
           ctx.fill();
         }
       });
 
       // Dessiner la maison
       ctx.fillStyle = "#8B4513";
-      ctx.fillRect(house.x, house.y, house.width, house.height);
-      ctx.fillStyle = "#000";
-      ctx.fillRect(house.x + house.width / 2 - 10, house.y + house.height - 40, 20, 40);
-
-      // Dessiner les ennemis
-      enemies.forEach(enemy => {
-        ctx.drawImage(enemy.image, enemy.x, enemy.y, enemy.width, enemy.height);
-      });
-
-      // Dessiner les projectiles d'attaque
-      attacks.forEach(attack => {
-        ctx.fillStyle = "#ff0";
-        ctx.beginPath();
-        ctx.arc(attack.x, attack.y, attack.radius, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      // Choix de l'image du joueur selon l'état
-      let playerImg;
-      if (player.transformed) {
-        playerImg = playerTransfoImg;
-      } else if (player.attacking) {
-        playerImg = playerStaticImg;
-      } else if (keys["ArrowLeft"] || keys["ArrowRight"]) {
-        playerImg = playerMovingImg;
-      } else {
-        playerImg = playerStaticImg;
-      }
-      ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
-
-      ctx.restore();
-
-      // Affichage du message de fin de niveau
-      if (levelFinished) {
-        ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "#fff";
-        ctx.font = "40px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("Niveau terminé !", canvas.width / 2, canvas.height / 2);
-      }
+      ctx.fillRect(house.x - cameraOffsetX, house.y, house.width, house.height);
     }
 
-    // Démarrage du jeu
+    // Fonction principale
+    function gameLoop() {
+      update();
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Démarrer le jeu lorsque le bouton est pressé
     document.getElementById("playBtn").addEventListener("click", () => {
       document.getElementById("menu").style.display = "none";
-      score = 0;
-      document.getElementById("score").innerText = "Score: 0";
-      levelFinished = false;
-      // Réinitialisation du joueur
-      player.x = 100;
-      player.y = 300;
-      player.vx = 0;
-      player.vy = 0;
-      player.transformed = false;
-      player.attacking = false;
-      // Réinitialiser la collecte des boules
-      balls.forEach(ball => ball.collected = false);
-      // Réinitialisation des positions des ennemis
-      if(enemies.length >= 4) {
-        enemies[0].x = 500;
-        enemies[1].x = 1000;
-        enemies[2].x = 320;
-        enemies[3].x = 1600;
-      }
-      // Vider les attaques en cours
-      attacks.length = 0;
-      update();
+      gameLoop();
     });
   </script>
 </body>

@@ -3,27 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jeu d'Échecs contre IA</title>
-    
-    <!-- Lien vers le fichier CSS -->
+    <title>Jeu d'Échecs</title>
     <link rel="stylesheet" href="css/style.css">
-
-    <!-- Librairies pour le jeu d'échecs -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <!-- Librairies nécessaires -->
+    <script src="js/libs/jquery.min.js"></script>
+    <script src="js/libs/chess.min.js"></script>
+    <script src="js/libs/chessboard.min.js"></script>
 </head>
 <body>
+    <h1>Jeu d'échecs contre l'IA</h1>
+    <div id="board" style="width: 500px"></div>
+    <p id="status"></p>
 
-    <h1>Jeu d'échecs contre IA</h1>
-    
-    <div id="board"></div>
-    <p id="status">C'est aux blancs de jouer</p>
-    
-    <button id="restart">Recommencer</button>
-
-    <!-- Lien vers le fichier JavaScript -->
-    <script src="js/script.js"></script>
-
+    <script src="js/script.js"></script> <!-- Chargement du script principal -->
 </body>
 </html>

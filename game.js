@@ -27,13 +27,12 @@ class GameScene extends Phaser.Scene {
     }
 
     preload() {
-        this.load.image('player', 'assets/player.png');
-        this.load.image('zombie', 'assets/zombie.png');
-        this.load.image('bullet', 'assets/shot.png');
-        this.load.image('background', 'assets/background.png');
-        this.load.audio('shoot', 'assets/sound_effects/shoot.wav');
-        this.load.audio('hitZombie', 'assets/sound_effects/hit_zombie.wav');
-    }
+this.load.image('background', 'un-petit-jeux-/assets/background.png');
+this.load.image('player', 'un-petit-jeux-/assets/player.png');
+this.load.image('zombie', 'un-petit-jeux-/assets/zombie.png');
+this.load.image('bullet', 'un-petit-jeux-/assets/shot.png');
+this.load.audio('shoot', 'un-petit-jeux-/assets/sound_effects/shoot.wav');
+this.load.audio('hitZombie', 'un-petit-jeux-/assets/sound_effects/hit_zombie.wav');
 
     create() {
         this.add.image(400, 300, 'background');

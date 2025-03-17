@@ -15,7 +15,7 @@ class MainMenu extends Phaser.Scene {
             fill: '#ffffff'
         });
 
-        this.input.keyboard.on('keydown-ENTER', () => {
+        this.input.keyboard.on('keydown-Enter', () => {
             this.scene.start('GameScene');
         });
     }
@@ -36,14 +36,11 @@ class GameScene extends Phaser.Scene {
     }
 
     create() {
-        // Ajouter le fond
         this.add.image(400, 300, 'background');
 
-        // Ajouter le joueur
         this.player = this.physics.add.image(100, 450, 'player').setScale(0.5);
         this.player.setCollideWorldBounds(true);
 
-        // Ajouter les zombies
         this.zombies = this.physics.add.group({
             key: 'zombie',
             repeat: 5,
@@ -56,26 +53,21 @@ class GameScene extends Phaser.Scene {
             zombie.setVelocity(Phaser.Math.Between(-200, 200), 20);
         });
 
-        // Groupes de balles
         this.bullets = this.physics.add.group({
             defaultKey: 'bullet',
             maxSize: 10
         });
 
-        // Sons
         this.soundShoot = this.sound.add('shoot');
         this.soundHit = this.sound.add('hitZombie');
 
-        // Clavier
         this.cursors = this.input.keyboard.createCursorKeys();
         this.spaceBar = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
-        // Collisions
         this.physics.add.collider(this.bullets, this.zombies, this.hitZombie, null, this);
     }
 
     update() {
-        // Déplacement du joueur
         if (this.cursors.left.isDown) {
             this.player.setVelocityX(-160);
         } else if (this.cursors.right.isDown) {
@@ -84,38 +76,42 @@ class GameScene extends Phaser.Scene {
             this.player.setVelocityX(0);
         }
 
-        if (this.cursors.up.isDown && this.player.body.touching.down) {
+        if (this.cursors.up.isDown && this.player.body.blocked.down) {
             this.player.setVelocityY(-330);
         }
 
-        // Tirer
         if (Phaser.Input.Keyboard.JustDown(this.spaceBar)) {
             this.shootBullet();
         }
     }
 
     shootBullet() {
-        let bullet = this.bullets.create(this.player.x + 50, this.player.y, 'bullet');
+        if (!this.bullets) return;
+
+        let bullet = this.bullets.get(this.player.x + 50, this.player.y, 'bullet');
         if (bullet) {
+            bullet.setActive(true);
+            bullet.setVisible(true);
             bullet.setVelocityX(400);
             this.soundShoot.play();
         }
     }
 
     hitZombie(bullet, zombie) {
+        if (!bullet || !zombie) return;
+
         bullet.destroy();
         zombie.setTint(0xff0000);
         zombie.setVelocity(0);
         this.soundHit.play();
 
-        setTimeout(() => {
+        this.time.delayedCall(500, () => {
             zombie.clearTint();
             zombie.setVelocity(Phaser.Math.Between(-200, 200), 20);
-        }, 500);
+        });
     }
 }
 
-// Configuration du jeu
 const config = {
     type: Phaser.AUTO,
     width: 800,
@@ -127,5 +123,4 @@ const config = {
     scene: [MainMenu, GameScene]
 };
 
-// Lancer le jeu
 const game = new Phaser.Game(config);

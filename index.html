@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mini Jeu Phaser</title>
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.0/dist/phaser.js"></script> <!-- Charger Phaser depuis CDN -->
-    <style>
-        body { margin: 0; overflow: hidden; }
-    </style>
+    <title>Zombie Shooter - Mini Jeu Phaser</title>
+    <script src="lib/phaser.js"></script> <!-- Charge Phaser depuis ton dossier local -->
+    <link rel="stylesheet" href="assets/style.css"> <!-- Optionnel pour du CSS -->
 </head>
 <body>
-    <script src="game.js"></script> <!-- Charger le fichier de jeu -->
+
+    <div id="game-container"></div> <!-- Zone où le jeu sera affiché -->
+
+    <script src="game.js"></script> <!-- Charge le jeu -->
 </body>
 </html>
